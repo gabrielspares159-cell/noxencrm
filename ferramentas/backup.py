@@ -19,7 +19,7 @@ INCLUIR = ["CLAUDE.md", ".claude/agents", "crm", "clientes", "agencia", "central
            "central/index.html", "central/LEIA-ME.md", "painel.html", "ferramentas/gerar_painel.py",
            "ferramentas/painel_modelo.html", "ferramentas/gerar_central.py", "ferramentas/baixar_buscas.py",
            "ferramentas/backup.py", "docker-compose.yml", "docker", ".gitignore", ".gitmodules", "README.md",
-           "RESTAURAR.md", "restaurar.ps1", "restaurar.sh"]
+           "RESTAURAR.md", "restaurar.ps1", "restaurar.sh", ".gitattributes", "modelos", "central/conteudo.exemplo", ".claude/launch.json"]
 EXTRAS = ["backups/banco", "backups/extras", "backups/buscador"]
 
 

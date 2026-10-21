@@ -22,7 +22,7 @@ docker compose up -d
 Comandos úteis:
 - `docker compose run --rm gerador`: gera de novo a Central e o painel depois de mudar os arquivos.
 - `docker compose --profile ferramentas run --rm baixar-buscas`: salva as buscas concluídas em `crm/buscas/` e gera a Central.
-- `docker compose stop`: desliga tudo. Os dados do buscador ficam no volume `noxen_gmaps_data`.
+- `docker compose stop`: desliga tudo. Os dados do buscador ficam no volume `google-maps-scraper-kit_gmaps_data`.
 
 A **Central completa** (edições sincronizadas entre aparelhos, envio de arquivos, IA) é a publicada no claude.ai: https://claude.ai/artifact/SkXRwUrkNyaFkfkybM7pwD
 

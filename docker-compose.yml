@@ -77,6 +77,6 @@ services:
 
 volumes:
   gmaps_data:
-    name: noxen_gmaps_data
+    name: google-maps-scraper-kit_gmaps_data
   gmaps_cache:
-    name: noxen_gmaps_cache
+    name: google-maps-scraper-kit_gmaps_cache
