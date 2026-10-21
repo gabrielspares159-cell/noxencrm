@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel Noxen</title>
+<style>
+  :root {
+    --bg: #f6f6f8; --card: #ffffff; --text: #17171c; --muted: #6b6b78; --line: #e4e4ea;
+    --accent: #5b3fd1; --accent-soft: #ece8fb; --ok: #1f8a4c; --ok-soft: #e3f4ea;
+    --warn: #b26a00; --warn-soft: #fbf0dc; --bad: #c0362c; --bad-soft: #fbe5e3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111116; --card: #1b1b22; --text: #ececf1; --muted: #9a9aa8; --line: #2c2c36;
+      --accent: #9d86ff; --accent-soft: #2a2442; --ok: #5cc98a; --ok-soft: #173325;
+      --warn: #e6a94a; --warn-soft: #3a2c14; --bad: #ff7a6e; --bad-soft: #3d1c1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  h1 { font-size: 22px; margin: 0; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; gap: 14px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 14px; }
+  .duo { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); margin-bottom: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; }
+  .kpi .rotulo { color: var(--muted); font-size: 13px; }
+  .kpi .valor { font-size: 28px; font-weight: 650; margin: 4px 0; font-variant-numeric: tabular-nums; }
+  .barra { height: 8px; background: var(--accent-soft); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+  .barra > div { height: 100%; background: var(--accent); border-radius: 99px; }
+  ul.lista { list-style: none; margin: 0; padding: 0; }
+  ul.lista li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+  ul.lista li:first-child { border-top: 0; }
+  .lado { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .t-ok { background: var(--ok-soft); color: var(--ok); }
+  .t-warn { background: var(--warn-soft); color: var(--warn); }
+  .t-bad { background: var(--bad-soft); color: var(--bad); }
+  .t-neutro { background: var(--accent-soft); color: var(--accent); }
+  .vazio { color: var(--muted); font-size: 14px; padding: 6px 0; }
+  .tabela { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-top: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; border-top: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .funil { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .etapa { background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; min-width: 110px; }
+  .etapa b { display: block; font-size: 20px; color: var(--accent); }
+  .etapa span { font-size: 12px; color: var(--muted); }
+  footer { margin-top: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1><span>Noxen</span> · Painel do CRM</h1>
+    <div class="muted" id="gerado"></div>
+  </header>
+
+  <section class="grid kpis" id="kpis"></section>
+
+  <section class="grid duo">
+    <div class="card"><h2>Próximos vencimentos (30 dias)</h2><ul class="lista" id="vencimentos"></ul></div>
+    <div class="card"><h2>Próximas reuniões</h2><ul class="lista" id="reunioes"></ul></div>
+  </section>
+
+  <section class="grid duo">
+    <div class="card"><h2>Pagamentos em aberto</h2><ul class="lista" id="abertos"></ul></div>
+    <div class="card"><h2>Pipeline de leads</h2><div class="funil" id="funil"></div><ul class="lista" id="proximosLeads"></ul></div>
+  </section>
+
+  <section class="card">
+    <h2>Carteira de clientes</h2>
+    <div class="tabela"><table id="clientes"></table></div>
+  </section>
+
+  <footer class="muted">Os dados vêm de <code>crm/carteira.md</code>, <code>crm/leads.md</code> e <code>clientes/*/financeiro.md</code>. Para atualizar, peça ao Diretor Noxen: “atualizar painel”.</footer>
+</main>
+
+<script>
+const DADOS = /*__DADOS__*/null || { geradoEm: "-", carteira: [], leads: [], pagamentos: [] };
+const META_CLIENTES = 10;
+const PRAZO_META = new Date(2026, 10, 30); // 30/11/2026
+
+const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+const DIA = 86400000;
+
+function txt(v) { return String(v ?? "").trim(); }
+function esc(v) { return txt(v).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function campo(obj, ...nomes) {
+  for (const k of Object.keys(obj)) {
+    const kk = k.toLowerCase();
+    if (nomes.some(n => kk.startsWith(n.toLowerCase()))) return txt(obj[k]);
+  }
+  return "";
+}
+function dinheiro(v) {
+  let s = txt(v).replace(/R\$|\s/g, "");
+  if (!s) return 0;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+const brl = n => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+function data(v) {
+  const m = txt(v).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\D+(\d{1,2})[:h](\d{2})?)?/);
+  if (!m) return null;
+  const ano = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+  return new Date(ano, +m[2] - 1, +m[1], m[4] ? +m[4] : 0, m[5] ? +m[5] : 0);
+}
+const fmtData = d => d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+function diasAte(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return Math.round((x - hoje) / DIA); }
+function quando(dias) {
+  if (dias < 0) return `<span class="tag t-bad">há ${-dias} dia${dias === -1 ? "" : "s"}</span>`;
+  if (dias === 0) return `<span class="tag t-warn">hoje</span>`;
+  if (dias <= 3) return `<span class="tag t-warn">em ${dias} dia${dias === 1 ? "" : "s"}</span>`;
+  return `<span class="tag t-neutro">em ${dias} dias</span>`;
+}
+const vazio = msg => `<li class="vazio">${msg}</li>`;
+
+const clientes = DADOS.carteira.map(c => ({
+  nome: campo(c, "Cliente"), segmento: campo(c, "Segmento"), cidade: campo(c, "Cidade"),
+  status: campo(c, "Status"), impl: dinheiro(campo(c, "Implementa")), mensal: dinheiro(campo(c, "Mensalidade")),
+  dia: parseInt(campo(c, "Dia de venc"), 10), reuniao: data(campo(c, "Próxima reunião", "Proxima reuniao")),
+  reuniaoTxt: campo(c, "Próxima reunião", "Proxima reuniao"), resp: campo(c, "Responsável", "Responsavel"),
+})).filter(c => c.nome);
+
+const st = s => s.toLowerCase();
+const ativos = clientes.filter(c => st(c.status).startsWith("ativo"));
+const emImpl = clientes.filter(c => st(c.status).startsWith("implementa"));
+const naCarteira = ativos.length + emImpl.length;
+const mrr = ativos.reduce((s, c) => s + c.mensal, 0);
+const mrrContratado = mrr + emImpl.reduce((s, c) => s + c.mensal, 0);
+const ticket = ativos.length ? mrr / ativos.length : 0;
+const diasMeta = Math.max(0, Math.round((PRAZO_META - hoje) / DIA));
+
+const ETAPAS = ["A contatar", "Contatado", "Respondeu", "Reunião marcada", "Proposta enviada", "Fechado", "Perdido"];
+const leads = DADOS.leads.map(l => ({
+  nome: campo(l, "Lead"), etapa: campo(l, "Etapa"), passo: campo(l, "Próximo passo", "Proximo passo"),
+  quando: data(campo(l, "Data do próximo", "Data do proximo")), valor: dinheiro(campo(l, "Valor")),
+})).filter(l => l.nome);
+const fechado = e => /fechado|ganho|perdido/i.test(e);
+const leadsAbertos = leads.filter(l => !fechado(l.etapa));
+
+// KPIs
+const pct = Math.min(100, Math.round(naCarteira / META_CLIENTES * 100));
+document.getElementById("gerado").textContent = `Dados de ${DADOS.geradoEm} · hoje ${hoje.toLocaleDateString("pt-BR")}`;
+document.getElementById("kpis").innerHTML = `
+  <div class="card kpi"><div class="rotulo">Clientes na carteira (meta ${META_CLIENTES})</div>
+    <div class="valor">${naCarteira} / ${META_CLIENTES}</div>
+    <div class="muted">${ativos.length} ativos · ${emImpl.length} em implementação · ${diasMeta} dias até 30/11</div>
+    <div class="barra"><div style="width:${pct}%"></div></div></div>
+  <div class="card kpi"><div class="rotulo">MRR (mensalidades ativas)</div>
+    <div class="valor">${brl(mrr)}</div>
+    <div class="muted">${brl(mrrContratado)} contando quem está em implementação</div></div>
+  <div class="card kpi"><div class="rotulo">Ticket médio mensal</div>
+    <div class="valor">${brl(ticket)}</div>
+    <div class="muted">Implementações em andamento: ${brl(emImpl.reduce((s, c) => s + c.impl, 0))}</div></div>
+  <div class="card kpi"><div class="rotulo">Leads em aberto</div>
+    <div class="valor">${leadsAbertos.length}</div>
+    <div class="muted">Potencial: ${brl(leadsAbertos.reduce((s, l) => s + l.valor, 0))}</div></div>`;
+
+// Vencimentos: próximo dia de vencimento de cada cliente com mensalidade
+function proximoVenc(dia) {
+  const ultimoDia = (a, m) => new Date(a, m + 1, 0).getDate();
+  let a = hoje.getFullYear(), m = hoje.getMonth();
+  let d = new Date(a, m, Math.min(dia, ultimoDia(a, m)));
+  if (d < hoje) { m += 1; d = new Date(a, m, Math.min(dia, ultimoDia(a, m))); }
+  return d;
+}
+const venc = clientes
+  .filter(c => (st(c.status).startsWith("ativo") || st(c.status).startsWith("implementa")) && c.dia >= 1 && c.dia <= 31 && c.mensal > 0)
+  .map(c => ({ ...c, data: proximoVenc(c.dia) }))
+  .filter(c => diasAte(c.data) <= 30)
+  .sort((a, b) => a.data - b.data);
+document.getElementById("vencimentos").innerHTML = venc.length
+  ? venc.map(c => `<li><div><b>${esc(c.nome)}</b><div class="muted">${fmtData(c.data)} · ${quando(diasAte(c.data))}</div></div><div class="lado">${brl(c.mensal)}</div></li>`).join("")
+  : vazio("Nenhum vencimento nos próximos 30 dias.");
+
+// Reuniões
+const reun = clientes.filter(c => c.reuniao && !st(c.status).startsWith("encerr")).sort((a, b) => a.reuniao - b.reuniao);
+const semData = clientes.filter(c => !c.reuniao && (st(c.status).startsWith("ativo") || st(c.status).startsWith("implementa")));
+document.getElementById("reunioes").innerHTML = (reun.length || semData.length)
+  ? reun.map(c => {
+      const d = diasAte(c.reuniao);
+      const hora = c.reuniao.getHours() ? " · " + c.reuniao.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+      const nota = d < 0 ? `<div class="muted">Já passou — registre a reunião e marque a próxima.</div>` : "";
+      return `<li><div><b>${esc(c.nome)}</b>${nota}</div><div class="lado">${fmtData(c.reuniao)}${hora}<br>${quando(d)}</div></li>`;
+    }).join("") + semData.map(c => `<li><div><b>${esc(c.nome)}</b></div><div class="lado"><span class="tag t-warn">sem reunião marcada</span></div></li>`).join("")
+  : vazio("Nenhuma reunião registrada.");
+
+// Pagamentos em aberto (histórico de cada clientes/*/financeiro.md)
+const abertos = DADOS.pagamentos
+  .filter(p => !/pago|quitado/i.test(campo(p, "Status")) || /atras/i.test(campo(p, "Status")))
+  .filter(p => campo(p, "Status") || campo(p, "Vencimento"))
+  .map(p => ({ pasta: p.Pasta, ref: campo(p, "Mês de ref", "Mes de ref"), valor: dinheiro(campo(p, "Valor")),
+               venc: data(campo(p, "Vencimento")), status: campo(p, "Status") }))
+  .sort((a, b) => (a.venc || 0) - (b.venc || 0));
+document.getElementById("abertos").innerHTML = abertos.length
+  ? abertos.map(p => {
+      const atrasado = p.venc && diasAte(p.venc) < 0;
+      const tag = atrasado ? `<span class="tag t-bad">atrasado</span>` : `<span class="tag t-warn">${esc(p.status || "pendente")}</span>`;
+      return `<li><div><b>${esc(p.pasta)}</b><div class="muted">${esc(p.ref)}${p.venc ? " · vence " + p.venc.toLocaleDateString("pt-BR") : ""}</div></div><div class="lado">${brl(p.valor)}<br>${tag}</div></li>`;
+    }).join("")
+  : vazio("Nenhum pagamento em aberto no histórico dos clientes.");
+
+// Funil de leads
+const contagem = Object.fromEntries(ETAPAS.map(e => [e, 0]));
+leads.forEach(l => { const e = ETAPAS.find(x => x.toLowerCase() === l.etapa.toLowerCase()) || l.etapa || "A contatar"; contagem[e] = (contagem[e] || 0) + 1; });
+document.getElementById("funil").innerHTML = Object.entries(contagem)
+  .map(([e, n]) => `<div class="etapa"><b>${n}</b><span>${esc(e)}</span></div>`).join("");
+const proximos = leadsAbertos.filter(l => l.passo || l.quando).sort((a, b) => (a.quando || Infinity) - (b.quando || Infinity)).slice(0, 8);
+document.getElementById("proximosLeads").innerHTML = proximos.length
+  ? proximos.map(l => `<li><div><b>${esc(l.nome)}</b><div class="muted">${esc(l.etapa)} · ${esc(l.passo)}</div></div><div class="lado">${l.quando ? fmtData(l.quando) + "<br>" + quando(diasAte(l.quando)) : ""}</div></li>`).join("")
+  : vazio("Nenhum próximo passo de lead registrado.");
+
+// Tabela de clientes
+const tagStatus = s => {
+  const x = st(s);
+  const cls = x.startsWith("ativo") ? "t-ok" : x.startsWith("implementa") ? "t-neutro" : x.startsWith("pausa") ? "t-warn" : "t-bad";
+  return s ? `<span class="tag ${cls}">${esc(s)}</span>` : "";
+};
+document.getElementById("clientes").innerHTML = clientes.length
+  ? `<thead><tr><th>Cliente</th><th>Segmento</th><th>Cidade/UF</th><th>Status</th><th>Implementação</th><th>Mensalidade</th><th>Vence dia</th><th>Próxima reunião</th><th>Responsável</th></tr></thead><tbody>` +
+    clientes.map(c => `<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.segmento)}</td><td>${esc(c.cidade)}</td><td>${tagStatus(c.status)}</td>
+      <td class="num">${c.impl ? brl(c.impl) : ""}</td><td class="num">${c.mensal ? brl(c.mensal) : ""}</td><td class="num">${isNaN(c.dia) ? "" : c.dia}</td>
+      <td>${esc(c.reuniaoTxt)}</td><td>${esc(c.resp)}</td></tr>`).join("") + `</tbody>`
+  : `<tbody><tr><td class="vazio">Nenhum cliente ainda. Diga ao Diretor Noxen: “novo cliente &lt;nome&gt;”.</td></tr></tbody>`;
+</script>
+</body>
+</html>

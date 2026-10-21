@@ -1,0 +1,3 @@
+[submodule "ferramentas/google-maps-scraper-kit"]
+	path = ferramentas/google-maps-scraper-kit
+	url = https://github.com/vzbaggio/google-maps-scraper-kit.git

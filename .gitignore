@@ -1,0 +1,19 @@
+# ── Dados de clientes e prospecção: NUNCA vão para o git (repositório público) ──
+# Eles ficam só nesta máquina e no backup tar.gz (py ferramentas/backup.py).
+/crm/
+/clientes/*
+!/clientes/_modelo/
+/agencia/campanhas/
+/central/conteudo/
+/backups/
+
+# Gerados por ferramentas/gerar_painel.py e gerar_central.py (contêm os dados)
+/painel.html
+/central/index.html
+
+# Python
+__pycache__/
+*.pyc
+
+# Configuração local do Claude Code
+.claude/settings.local.json

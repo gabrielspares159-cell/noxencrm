@@ -1,0 +1,82 @@
+# Noxen em Docker: Central + painel + buscador de empresas (Google Maps Scraper Kit).
+#
+#   docker compose up -d                              # gera a Central e sobe tudo
+#   docker compose run --rm gerador                   # gera de novo a Central e o painel depois de mudar arquivos
+#   docker compose --profile ferramentas run --rm baixar-buscas   # baixa as buscas para crm/buscas
+#
+# Endereços (só neste computador):
+#   http://localhost:8090          Central Noxen (versão local; edições ficam no navegador)
+#   http://localhost:8090/painel   painel antigo
+#   http://localhost:8080          buscador de empresas (mapa e painel)
+#
+# A Central completa, com edições sincronizadas, envio de arquivos e IA, é a publicada no claude.ai.
+
+name: noxen
+
+services:
+  gerador:
+    image: python:3.12-slim
+    working_dir: /noxen
+    volumes:
+      - ./:/noxen
+    environment:
+      PYTHONIOENCODING: utf-8
+    command: ["sh", "-c", "python ferramentas/gerar_painel.py && python ferramentas/gerar_central.py"]
+    restart: "no"
+
+  central:
+    image: nginx:1.27-alpine
+    container_name: noxen-central
+    depends_on:
+      gerador:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8090:80"
+    volumes:
+      - ./docker/central-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./:/srv:ro
+    restart: unless-stopped
+
+  # Buscador de empresas. As definições seguem ferramentas/google-maps-scraper-kit/docker-compose.yml.
+  google-maps-scraper:
+    image: gosom/google-maps-scraper:v1.18.1
+    container_name: gmaps-scraper
+    restart: unless-stopped
+    command: ["-web", "-data-folder", "/gmapsdata"]
+    expose:
+      - "8080"
+    volumes:
+      - gmaps_data:/gmapsdata
+      - gmaps_cache:/opt
+
+  web:
+    image: nginx:1.27-alpine
+    container_name: gmaps-web
+    restart: unless-stopped
+    depends_on:
+      - google-maps-scraper
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./ferramentas/google-maps-scraper-kit/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ferramentas/google-maps-scraper-kit/scraper-proxy.inc:/etc/nginx/conf.d/scraper-proxy.inc:ro
+      - ./ferramentas/google-maps-scraper-kit/frontend:/usr/share/nginx/html:ro
+
+  baixar-buscas:
+    image: python:3.12-slim
+    profiles: ["ferramentas"]
+    working_dir: /noxen
+    volumes:
+      - ./:/noxen
+    environment:
+      PYTHONIOENCODING: utf-8
+      SCRAPER_BASE_URL: http://web:80
+    depends_on:
+      - web
+    command: ["sh", "-c", "python ferramentas/baixar_buscas.py && python ferramentas/gerar_central.py"]
+
+volumes:
+  gmaps_data:
+    name: noxen_gmaps_data
+  gmaps_cache:
+    name: noxen_gmaps_cache
